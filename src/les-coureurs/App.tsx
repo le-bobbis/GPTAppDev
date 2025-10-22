@@ -1,28 +1,54 @@
-import { useCallback, useMemo, type JSX } from "react";
-import { useDisplayMode } from "../use-display-mode";
-import { useWidgetProps } from "../use-widget-props";
-import { useWidgetState } from "../use-widget-state";
-import MissionSelection, {
-  type Mission,
-} from "./components/MissionSelection";
-import MissionPlay from "./components/MissionPlay";
-import TravelTrade, {
-  type TravelRoute,
-  type TradeOutcome,
-} from "./components/TravelTrade";
-import InventoryPanel, {
-  type InventoryItem,
-} from "./components/InventoryPanel";
-import CharacterSheet, {
-  type CrewProfile,
-} from "./components/CharacterSheet";
-import Leaderboard, {
-  type LeaderboardEntry,
-} from "./components/Leaderboard";
-import styles from "./App.module.css";
+// src/les-coureurs/App.tsx
+import React, { JSX, useMemo, useState } from "react";
+
+/** -----------------------------
+ *  Local types (drop-in friendly)
+ *  ----------------------------- */
+type Mission = {
+  id: string;
+  title: string;
+  difficulty: "Precarious" | "Dire" | "Bold" | string;
+  locale: string;
+  hook: string;
+  description: string;
+  phases: string[];
+  rewards: { credits: number; reputation: number; items: string[] };
+};
+
+type InventoryItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  rarity: "Common" | "Uncommon" | "Rare" | "Exotic" | string;
+  notes?: string;
+};
+
+type CrewProfile = {
+  callSign: string;
+  captain: string;
+  ship: string;
+  specialty: string;
+  origins: string;
+  values: string[];
+};
+
+type LeaderboardEntry = {
+  rank: number;
+  crew: string;
+  reputation: number;
+  lastRun: string;
+};
+
+type TravelRoute = {
+  id: string;
+  name: string;
+  distance: string;
+  risk: string;
+  opportunity: string;
+};
 
 type TravelRecord = {
-  id: string;
+  origin: string;
   destination: string;
   summary: string;
   profit: number;
@@ -46,103 +72,121 @@ type WidgetProps = {
   crew?: CrewProfile;
 };
 
+/** -------------------------------------
+ *  Minimal utility hooks (local shims)
+ *  ------------------------------------- */
+function useDisplayMode(): "full" | "compact" {
+  // Replace with your app's actual responsive mode if available.
+  return "full";
+}
+
+// Pretend the widget host can inject props; locally we just use defaults.
+function useWidgetProps<T>(init: () => T): T {
+  return useMemo(init, []); // no external props in this drop-in context
+}
+
+// State helper compatible with host/state sync; locally just React state.
+function useWidgetState<T>(init: () => T): [T, (updater: Partial<T> | ((prev: T) => T)) => void] {
+  const [state, setState] = useState<T>(init);
+  const update = (updater: Partial<T> | ((prev: T) => T)) => {
+    setState((prev) => (typeof updater === "function" ? (updater as (p: T) => T)(prev) : { ...prev, ...updater }));
+  };
+  return [state, update];
+}
+
+/** -----------------------------
+ *  Patched default content
+ *  ----------------------------- */
 const defaultMissions: Mission[] = [
   {
-    id: "radiant-auction",
-    title: "The Radiant Auction",
-    difficulty: "Calculated",
-    locale: "The Prism Exchange, Vega Spindle",
+    id: "glass-tithe",
+    title: "Le Dîme du Verre",
+    difficulty: "Precarious",
+    locale: "Les Verrières, sur la Loire Fendue",
     hook:
-      "Slip into the invitation-only art auction and walk out with a forbidden holo-icon before the clergy notices.",
+      "Slip past the Abbés du Soleil Noir to reclaim the Coalition des Lanternes' tithe before the salt fog reaches the kiln vaults.",
     description:
-      "A collector loyal to the Synod is showing off a relic they confiscated from the Coureurs. The crew must infiltrate the auction, swap the relic, and exfiltrate without triggering the zero-airlock lockdown.",
+      "Les Verrières depend on stained glass tithed to the Lantern Coalition to keep their watch-fires burning. When the Abbés seized the convoy, they hid the crates beneath the collapsed nave. Recover the tithe without igniting the powder-damp ruins.",
     phases: [
-      "Secure forged invitations and decode the guest registry.",
-      "Blend into the bidding floor while your ghost-hacker spoofs surveillance.",
-      "Make the swap in the reliquary and slip the mark onto the rival broker.",
-      "Evade Synod hunters through the habitat's mirrored maintenance shafts.",
+      "Charm entry papers from the quartermaster at the Canal des Cendres.",
+      "Shadow the abbé's beadledom through the nave and mark their patrol rhythm.",
+      "Haul the glass crates through the crypt sluices before the rising fog curdles the air.",
+      "Escort the wagon to the Lantern outpost on the ridge before dawn bells toll.",
     ],
-    rewards: {
-      credits: 620,
-      reputation: 2,
-      items: ["Synod cipher key", "Holo-icon replica"],
-    },
+    rewards: { credits: 340, reputation: 2, items: ["Lantern Coalition writ", "Stained glass tithe"] },
   },
   {
-    id: "salt-market",
-    title: "Letters of Salt",
-    difficulty: "Perilous",
-    locale: "Tide-locked moon of Cordelière",
+    id: "salt-barge",
+    title: "La Barge des Salines",
+    difficulty: "Dire",
+    locale: "Port-Royal des Brumes",
     hook:
-      "Deliver contraband desalination schematics to miners before the governor's embargo locks down the docks.",
+      "Ferry contraband well-casks upriver to the Bastion d'Étain while evading Mirecourt corsairs prowling the drowned quays.",
     description:
-      "The mining guild is starving for fresh water. The Coureurs can break the embargo if they outfly the patrol skiffs and broker peace between rival crews long enough to hand off the plans.",
+      "The Tin Bastion's cisterns are one bad week from running dry. The Bateliers de la Seine will pay handsomely if the cargo slips through Port-Royal without drawing the corsairs' swivel guns.",
     phases: [
-      "Chart a slipstream through the governor's blockade.",
-      "Broker a ceasefire between the Ember and Jade crews at the docks.",
-      "Upload the schematics to the miners' fabrication lattice before the signal jammers sweep back.",
-      "Exit with the guild's gratitude and keep your own ship off the sanction list.",
+      "Coax the rusted paddlewheel back to life with salvaged boiler rivets.",
+      "Bribe the Quai des Brumes lookouts to misreport your departure.",
+      "Navigate the salt-warped shallows while the corsairs loose grapples from the fog.",
+      "Trade the casks at the Bastion gates for coin and a pledge of future escorts.",
     ],
-    rewards: {
-      credits: 800,
-      reputation: 3,
-      items: ["Guild promissory note"],
-    },
+    rewards: { credits: 560, reputation: 3, items: ["Bastion escort marker"] },
   },
   {
-    id: "luminous-caravan",
-    title: "Luminous Caravan",
-    difficulty: "Daring",
-    locale: "Auroral skyways of the Roche Briar",
+    id: "orchid-courier",
+    title: "Message pour l'Orchidée",
+    difficulty: "Bold",
+    locale: "Citadelle de l'Orchidée Noire",
     hook:
-      "Escort a caravan of shimmer-silk skiffs through ion storms while a rival captain tries to poach your clients.",
+      "Carry a truce charter between rival glassmaker guilds before the Ashen Choir convinces them to burn the greenhouses.",
     description:
-      "Pilots loyal to House Briar need a Coureurs escort to outrun storm fronts and sabotage attempts. Keep morale high, fend off interceptors, and deliver every skiff intact for a premium bonus.",
+      "The Fraternité des Verriers will only parley if the Coureurs deliver the charter intact and prove the Lantern Coalition stands behind it. Every hour the Ashen Choir preaches, more apprentices take up torches.",
     phases: [
-      "Map the safest skyway currents and patch the lead skiff's ion sails.",
-      "Counter a rival captain's sabotage drones mid-flight.",
-      "Rally the caravan through the green-fire tempest and redistribute power across the flotilla.",
-      "Hand off the goods at Dawnspear and collect the surcharge for every intact skiff.",
+      "Secure the charter seals within the Concordat archives at Montreuil.",
+      "Ride the night stage through plague hamlets while ashfall drums the coach roof.",
+      "Present the truce under the watch of the Orchidée matriarch and read the clauses aloud.",
+      "Broker a joint vigil so the guild banners remain in the hall rather than on the pyres.",
     ],
-    rewards: {
-      credits: 540,
-      reputation: 1,
-      items: ["Briar signet"],
-    },
+    rewards: { credits: 420, reputation: 2, items: ["Orchidée signet"] },
   },
 ];
 
 const defaultInventory: InventoryItem[] = [
   {
-    id: "sky-maps",
-    name: "Ion-etched Sky Maps",
-    quantity: 3,
+    id: "lantern-maps",
+    name: "Cartes aux Lanternes",
+    quantity: 4,
     rarity: "Rare",
-    notes: "Folded charts that shimmer with predictive storm vectors.",
+    notes: "Hand-inked routes noting every standing beacon between Port-Royal and Montreuil.",
   },
   {
-    id: "trade-seals",
-    name: "Charter Seals",
-    quantity: 5,
-    rarity: "Common",
-    notes: "Stamped contracts granting safe passage through neutral docks.",
+    id: "telegraph-ciphers",
+    name: "Chiffres télégraphiques",
+    quantity: 6,
+    rarity: "Uncommon",
+    notes: "Copper plates for encoding dispatches along the shattered optical lines.",
   },
   {
-    id: "silk-strands",
-    name: "Shimmer-Silk Strands",
-    quantity: 12,
+    id: "mercury-poultice",
+    name: "Cataplasmes au mercure",
+    quantity: 9,
     rarity: "Exotic",
-    notes: "Luminescent threads traded as favors among Coureurs cells.",
+    notes: "Treats fog-burn lungs after a run through the salt marshes.",
   },
 ];
 
 const defaultCrew: CrewProfile = {
-  callSign: "Les Courants",
-  captain: "Maëlys Verdin",
-  ship: "Sloop Perseidae",
-  specialty: "Negotiator-pilot blending charm with reckless drift dives.",
-  origins: "Once a Synod courier, now the broker who keeps wayward crews fed and free.",
-  values: ["Mutual aid over conquest", "Stories as currency", "Every escape is a performance"],
+  callSign: "Courriers du Levant",
+  captain: "Capitaine Éloise Marceau",
+  ship: "Allège Sainte-Bernadette",
+  specialty: "Conductrice des canaux, l'esprit aussi affûté que son sabre-briquet.",
+  origins:
+    "Ancienne messagère impériale, rescapée des brasiers de la Seine, elle relie désormais les bastions alliés.",
+  values: [
+    "La parole donnée vaut plus que l'or",
+    "Protéger les phares de la Coalition des Lanternes",
+    "Jamais abandonner un village aux brumes",
+  ],
 };
 
 const defaultLeaderboard: LeaderboardEntry[] = [
@@ -153,28 +197,94 @@ const defaultLeaderboard: LeaderboardEntry[] = [
 
 const travelRoutes: TravelRoute[] = [
   {
-    id: "mirrors",
-    name: "Mirrorfields Run",
-    distance: "2 jumps",
-    risk: "Low heat, high sensor noise",
-    opportunity: "Swap luxury goods in refraction markets",
+    id: "canal-brume",
+    name: "Canal des Brumes",
+    distance: "2 jours",
+    risk: "Patrouilles corsaires embusquées sous la brume salée",
+    opportunity: "Troquer des vivres séchés contre des briques de charbon à Port-Royal",
   },
   {
-    id: "drift",
-    name: "Drift Hollows",
-    distance: "4 jumps",
-    risk: "Pirate activity spikes at dusk-cycle",
-    opportunity: "Acquire outlaw tech components on the cheap",
+    id: "route-lanterne",
+    name: "Route des Lanternes",
+    distance: "3 jours",
+    risk: "Postes de péage levés par les Abbés du Soleil Noir",
+    opportunity: "Gagner des faveurs en escortant les pèlerins jusqu'à la Citadelle d'Étain",
   },
   {
-    id: "braids",
-    name: "Braided Spires",
-    distance: "3 jumps",
-    risk: "Ion storms require precision flying",
-    opportunity: "House Briar buyers pay double for shimmer-silk",
+    id: "col-cendre",
+    name: "Col des Cendres",
+    distance: "4 jours",
+    risk: "Éboulements et messagers de l'Ashen Choir qui sèment la panique",
+    opportunity: "Revendre du verre soufflé aux verriers de Montreuil à prix double",
   },
 ];
 
+/** -----------------------------
+ *  UI Components
+ *  ----------------------------- */
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section style={{ marginBottom: 24 }}>
+      <h2 style={{ margin: "12px 0", fontSize: 18 }}>{title}</h2>
+      <div>{children}</div>
+    </section>
+  );
+}
+
+function MissionCard({
+  mission,
+  active,
+  onSelect,
+  stage,
+}: {
+  mission: Mission;
+  active: boolean;
+  onSelect: () => void;
+  stage: number;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        border: active ? "2px solid #222" : "1px solid #ccc",
+        borderRadius: 10,
+        padding: 12,
+        cursor: "pointer",
+        background: active ? "#fafafa" : "white",
+        marginBottom: 10,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <strong>{mission.title}</strong>
+        <span title="difficulty">{mission.difficulty}</span>
+      </div>
+      <small style={{ color: "#555" }}>{mission.locale}</small>
+      <p style={{ marginTop: 8 }}>{mission.hook}</p>
+      {active && (
+        <>
+          <ol style={{ paddingLeft: 18, marginTop: 8 }}>
+            {mission.phases.map((p, i) => (
+              <li key={i} style={{ opacity: i < stage ? 0.5 : 1 }}>
+                {p}
+              </li>
+            ))}
+          </ol>
+          <div style={{ marginTop: 8 }}>
+            <em>Rewards:</em>{" "}
+            <span>
+              {mission.rewards.credits} cr, +{mission.rewards.reputation} rep, {mission.rewards.items.join(", ")}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** -----------------------------
+ *  Main App
+ *  ----------------------------- */
 export function LesCoureursApp(): JSX.Element {
   const displayMode = useDisplayMode();
   const props = useWidgetProps<WidgetProps>(() => ({
@@ -184,9 +294,7 @@ export function LesCoureursApp(): JSX.Element {
   }));
 
   const missions = props.missions?.length ? props.missions : defaultMissions;
-  const leaderboardEntries = props.leaderboard?.length
-    ? props.leaderboard
-    : defaultLeaderboard;
+  const leaderboardEntries = props.leaderboard?.length ? props.leaderboard : defaultLeaderboard;
   const crewProfile = props.crew ?? defaultCrew;
 
   const [state, setState] = useWidgetState<LesCoureursState>(() => ({
@@ -200,241 +308,147 @@ export function LesCoureursApp(): JSX.Element {
     crew: crewProfile,
   }));
 
-  const selectedMission = useMemo(() => {
-    return missions.find((mission) => mission.id === state?.selectedMissionId) ?? null;
-  }, [missions, state?.selectedMissionId]);
+  const selected = missions.find((m) => m.id === state.selectedMissionId) ?? missions[0];
 
-  const handleSelectMission = useCallback(
-    (missionId: string) => {
-      setState((prevState) => {
-        if (!prevState) {
-          return prevState;
-        }
-
-        return {
-          ...prevState,
-          selectedMissionId: missionId,
-          missionStage: 0,
-        };
-      });
-    },
-    [setState]
-  );
-
-  const handleAdvanceMission = useCallback(() => {
-    if (!selectedMission) {
-      return;
-    }
-
-    setState((prevState) => {
-      if (!prevState) {
-        return prevState;
-      }
-
-      const nextStage = Math.min(
-        prevState.missionStage + 1,
-        selectedMission.phases.length
-      );
-
-      const missionCompleted = nextStage >= selectedMission.phases.length;
-
-      const updatedInventory = missionCompleted && selectedMission.rewards.items
-        ? mergeInventory(prevState.inventory, selectedMission.rewards.items)
-        : prevState.inventory;
-
-      return {
-        ...prevState,
-        missionStage: nextStage,
-        completedMissions: missionCompleted
-          ? Array.from(new Set([...prevState.completedMissions, selectedMission.id]))
-          : prevState.completedMissions,
-        credits: missionCompleted
-          ? prevState.credits + selectedMission.rewards.credits
-          : prevState.credits,
-        reputation: missionCompleted
-          ? prevState.reputation + selectedMission.rewards.reputation
-          : prevState.reputation,
-        inventory: updatedInventory,
-      };
-    });
-  }, [selectedMission, setState]);
-
-  const handleResetMission = useCallback(() => {
-    setState((prevState) => {
-      if (!prevState) {
-        return prevState;
-      }
-
-      return {
-        ...prevState,
+  function advanceStage() {
+    if (!selected) return;
+    const next = Math.min(state.missionStage + 1, selected.phases.length);
+    // If mission completed, record travel/profit history as a simple example.
+    if (next === selected.phases.length) {
+      setState((prev) => ({
+        ...prev,
         missionStage: 0,
-      };
-    });
-  }, [setState]);
-
-  const handleCompleteRoute = useCallback(
-    ({ routeId, profit, summary, cargoDelta }: TradeOutcome) => {
-      const route = travelRoutes.find((candidate) => candidate.id === routeId);
-
-      setState((prevState) => {
-        if (!prevState) {
-          return prevState;
-        }
-
-        const updatedInventory = cargoDelta
-          ? adjustInventory(prevState.inventory, cargoDelta)
-          : prevState.inventory;
-
-        const record: TravelRecord = {
-          id: `${routeId}-${Date.now()}`,
-          destination: route?.name ?? routeId,
-          summary: summary ?? (route ? route.opportunity : ""),
-          profit,
-          timestamp: new Date().toISOString(),
-        };
-
-        const nextHistory = [record, ...prevState.travelHistory].slice(0, 6);
-
-        return {
-          ...prevState,
-          credits: prevState.credits + profit,
-          reputation: profit > 0 ? prevState.reputation + 1 : prevState.reputation,
-          inventory: updatedInventory,
-          travelHistory: nextHistory,
-        };
-      });
-    },
-    [setState]
-  );
-
-  const playerLeaderboardEntry = useMemo<LeaderboardEntry>(() => {
-    return {
-      rank: 0,
-      crew: crewProfile.callSign,
-      reputation: state?.reputation ?? 0,
-      lastRun:
-        state?.travelHistory?.[0]?.summary ?? "Planning the next daring courier run",
-    };
-  }, [crewProfile.callSign, state?.reputation, state?.travelHistory]);
+        completedMissions: [...prev.completedMissions, selected.id],
+        credits: prev.credits + selected.rewards.credits,
+        reputation: prev.reputation + selected.rewards.reputation,
+        travelHistory: [
+          ...prev.travelHistory,
+          {
+            origin: "Divers",
+            destination: selected.locale,
+            summary: `Completed: ${selected.title}`,
+            profit: selected.rewards.credits,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        inventory: [
+          ...prev.inventory,
+          ...selected.rewards.items.map<InventoryItem>((nm, idx) => ({
+            id: `${selected.id}-item-${idx}`,
+            name: nm,
+            quantity: 1,
+            rarity: "Common",
+          })),
+        ],
+      }));
+    } else {
+      setState({ missionStage: next });
+    }
+  }
 
   return (
-    <div
-      className={[
-        styles.app,
-        displayMode === "fullscreen" ? styles.fullscreen : styles.inline,
-      ].join(" ")}
-    >
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Les Coureurs Dispatch</h1>
-          <p className={styles.subtitle}>
-            Courier crews swapping secrets, credits, and stories across the fringe.
-          </p>
-        </div>
-        <div className={styles.statusPanel}>
-          <span className={styles.statusItem}>
-            <strong>Credits</strong>
-            <span>{state?.credits ?? 0}</span>
-          </span>
-          <span className={styles.statusItem}>
-            <strong>Reputation</strong>
-            <span>{state?.reputation ?? 0}</span>
-          </span>
+    <div style={{ fontFamily: "system-ui, sans-serif", padding: 16, lineHeight: 1.35 }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+        <h1 style={{ fontSize: 22, margin: 0 }}>LES COUREURS — Tableau de Bord</h1>
+        <div title="display-mode" style={{ color: "#666" }}>
+          {displayMode === "full" ? "Mode: complet" : "Mode: compact"}
         </div>
       </header>
 
-      <section className={styles.missionRow}>
-        <MissionSelection
-          missions={missions}
-          selectedMissionId={state?.selectedMissionId ?? null}
-          onSelectMission={handleSelectMission}
-          completedMissionIds={state?.completedMissions ?? []}
-        />
-        <MissionPlay
-          mission={selectedMission}
-          stage={state?.missionStage ?? 0}
-          onAdvanceStage={handleAdvanceMission}
-          onResetStage={handleResetMission}
-        />
-      </section>
+      <Section title="Équipage">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <strong>{state.crew.callSign}</strong> — {state.crew.captain}
+            <div style={{ color: "#444" }}>{state.crew.ship}</div>
+            <div style={{ marginTop: 6 }}>{state.crew.specialty}</div>
+            <small style={{ color: "#555" }}>{state.crew.origins}</small>
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {state.crew.values.map((v, i) => (
+              <li key={i}>{v}</li>
+            ))}
+          </ul>
+        </div>
+      </Section>
 
-      <section className={styles.grid}>
-        <TravelTrade
-          routes={travelRoutes}
-          credits={state?.credits ?? 0}
-          inventory={state?.inventory ?? []}
-          onCompleteRun={handleCompleteRoute}
-        />
-        <InventoryPanel inventory={state?.inventory ?? []} credits={state?.credits ?? 0} />
-        <CharacterSheet
-          crew={state?.crew ?? crewProfile}
-          reputation={state?.reputation ?? 0}
-          completedMissionIds={state?.completedMissions ?? []}
-          travelHistory={state?.travelHistory ?? []}
-        />
-        <Leaderboard
-          entries={leaderboardEntries}
-          playerEntry={playerLeaderboardEntry}
-        />
-      </section>
+      <Section title="Missions">
+        {missions.map((m) => (
+          <MissionCard
+            key={m.id}
+            mission={m}
+            active={m.id === selected?.id}
+            stage={m.id === selected?.id ? state.missionStage : 0}
+            onSelect={() =>
+              setState({
+                selectedMissionId: m.id,
+                missionStage: 0,
+              })
+            }
+          />
+        ))}
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button onClick={advanceStage} style={{ padding: "8px 12px", borderRadius: 8 }}>
+            {state.missionStage >= (selected?.phases.length ?? 1) - 1 ? "Terminer" : "Avancer l'étape"}
+          </button>
+          <div style={{ alignSelf: "center", color: "#333" }}>
+            Étape: {Math.min(state.missionStage + 1, selected?.phases.length ?? 1)} / {selected?.phases.length ?? 1}
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Inventaire">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+          {state.inventory.map((it) => (
+            <div key={it.id} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10 }}>
+              <strong>{it.name}</strong>
+              <div>
+                Qté: {it.quantity} • <em>{it.rarity}</em>
+              </div>
+              {it.notes && <small style={{ color: "#555" }}>{it.notes}</small>}
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Itinéraires">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+          {travelRoutes.map((r) => (
+            <div key={r.id} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 10 }}>
+              <strong>{r.name}</strong> <small>• {r.distance}</small>
+              <div style={{ marginTop: 6 }}>
+                <em>Risque:</em> {r.risk}
+              </div>
+              <div>
+                <em>Opportunité:</em> {r.opportunity}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Classement">
+        <ol style={{ paddingLeft: 18, margin: 0 }}>
+          {leaderboardEntries.map((e) => (
+            <li key={e.rank} style={{ marginBottom: 6 }}>
+              <strong>#{e.rank}</strong> {e.crew} — rep {e.reputation} <small>({e.lastRun})</small>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <footer style={{ display: "flex", gap: 16, marginTop: 16, paddingTop: 8, borderTop: "1px solid #eee" }}>
+        <div>
+          <strong>Crédits:</strong> {state.credits}
+        </div>
+        <div>
+          <strong>Réputation:</strong> {state.reputation}
+        </div>
+        <div>
+          <strong>Missions accomplies:</strong> {state.completedMissions.length}
+        </div>
+      </footer>
     </div>
   );
-}
-
-function mergeInventory(
-  inventory: InventoryItem[],
-  newItems: string[]
-): InventoryItem[] {
-  const inventoryMap = new Map(inventory.map((item) => [item.name, { ...item }]));
-
-  newItems.forEach((itemName) => {
-    if (inventoryMap.has(itemName)) {
-      const existing = inventoryMap.get(itemName)!;
-      inventoryMap.set(itemName, { ...existing, quantity: existing.quantity + 1 });
-    } else {
-      inventoryMap.set(itemName, {
-        id: itemName.toLowerCase().replace(/\s+/g, "-"),
-        name: itemName,
-        quantity: 1,
-        rarity: "Uncommon",
-        notes: "Fresh haul from a successful mission.",
-      });
-    }
-  });
-
-  return Array.from(inventoryMap.values());
-}
-
-function adjustInventory(
-  inventory: InventoryItem[],
-  delta: TradeOutcome["cargoDelta"]
-): InventoryItem[] {
-  if (!delta) {
-    return inventory;
-  }
-
-  const inventoryMap = new Map(inventory.map((item) => [item.id, { ...item }]));
-  const { id, name, quantityChange, rarity, notes } = delta;
-  const existing = inventoryMap.get(id);
-
-  if (existing) {
-    const updatedQuantity = Math.max(existing.quantity + quantityChange, 0);
-    if (updatedQuantity === 0) {
-      inventoryMap.delete(id);
-    } else {
-      inventoryMap.set(id, { ...existing, quantity: updatedQuantity });
-    }
-  } else if (quantityChange > 0) {
-    inventoryMap.set(id, {
-      id,
-      name,
-      quantity: quantityChange,
-      rarity: rarity ?? "Common",
-      notes: notes ?? "Freshly acquired on the last run.",
-    });
-  }
-
-  return Array.from(inventoryMap.values());
 }
 
 export default LesCoureursApp;
